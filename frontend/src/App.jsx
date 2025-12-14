@@ -7,20 +7,22 @@ const App = () => {
   const [cx, setCx] = useState(-1.0);
   const [cy, setCy] = useState(-1.0);
   const [epsilon, setEpsilon] = useState(0.0); // 0のときは線形
-  const [solution, setSolution] = useState({ x: 0, y: 0 });
+  const [solution, setSolution] = useState({ x: 0, y: 0, objective_value: 0, success: false });
 
   // 最適化APIを叩く
   useEffect(() => {
     const fetchSolution = async () => {
       try {
         const response = await axios.post('http://localhost:8000/optimize', {
-          cx: parseFloat(cx),
-          cy: parseFloat(cy),
-          epsilon: parseFloat(epsilon),
+          cx: parseFloat(cx) || 0,
+          cy: parseFloat(cy) || 0,
+          epsilon: parseFloat(epsilon) || 0,
         });
         setSolution(response.data);
       } catch (error) {
         console.error("Optimization error", error);
+        // エラー時はデフォルト値を設定
+        setSolution({ x: 0, y: 0, objective_value: 0, success: false });
       }
     };
     fetchSolution();
@@ -46,7 +48,8 @@ const App = () => {
         const xi = x[i];
         const yi = y[j];
         // 目的関数の値を計算 Z = cx*x + cy*y + (eps/2)(x^2+y^2)
-        const val = cx * xi + cy * yi + (epsilon / 2.0) * (xi * xi + yi * yi);
+        const eps = parseFloat(epsilon) || 0;
+        const val = parseFloat(cx) * xi + parseFloat(cy) * yi + (eps / 2.0) * (xi * xi + yi * yi);
         row.push(val);
       }
       z.push(row);
@@ -77,7 +80,7 @@ const App = () => {
             <label><strong>Cx (X方向の傾き):</strong> {cx}</label>
             <input 
               type="range" min="-2" max="2" step="0.1" value={cx} 
-              onChange={e => setCx(e.target.value)} style={{ width: '100%' }} 
+              onChange={e => setCx(parseFloat(e.target.value))} style={{ width: '100%' }} 
             />
           </div>
 
@@ -85,7 +88,7 @@ const App = () => {
             <label><strong>Cy (Y方向の傾き):</strong> {cy}</label>
             <input 
               type="range" min="-2" max="2" step="0.1" value={cy} 
-              onChange={e => setCy(e.target.value)} style={{ width: '100%' }} 
+              onChange={e => setCy(parseFloat(e.target.value))} style={{ width: '100%' }} 
             />
           </div>
 
@@ -93,18 +96,64 @@ const App = () => {
             <label><strong>ε (イプシロン / お椀の深さ):</strong> {epsilon}</label>
             <br/>
             <span style={{fontSize: '0.8em', color: '#666'}}>
-              {epsilon == 0 ? "現在は「線形計画」モードです" : "現在は「二乗項（正則化）」モードです"}
+              {parseFloat(epsilon) === 0 ? "現在は「線形計画」モードです" : "現在は「二乗項（正則化）」モードです"}
             </span>
             <input 
               type="range" min="0" max="5" step="0.1" value={epsilon} 
-              onChange={e => setEpsilon(e.target.value)} style={{ width: '100%' }} 
+              onChange={e => setEpsilon(parseFloat(e.target.value))} style={{ width: '100%' }} 
             />
           </div>
 
           <div style={{ marginTop: '30px', backgroundColor: '#eef', padding: '10px', borderRadius: '5px' }}>
             <h4>📍 現在の最適解</h4>
-            <p>x = {solution.x.toFixed(4)}</p>
-            <p>y = {solution.y.toFixed(4)}</p>
+            <p>x = {solution.x?.toFixed(4) || '0.0000'}</p>
+            <p>y = {solution.y?.toFixed(4) || '0.0000'}</p>
+            {solution.success !== undefined && (
+              <p style={{ fontSize: '0.9em', color: solution.success ? 'green' : 'red' }}>
+                {solution.success ? '✓ 最適化成功' : '✗ 最適化失敗'}
+              </p>
+            )}
+          </div>
+
+          {/* 定式化の検証セクション */}
+          <div style={{ marginTop: '20px', backgroundColor: '#fff8e1', padding: '15px', borderRadius: '5px', border: '1px solid #ffc107' }}>
+            <h4>📐 定式化の検証</h4>
+            
+            <div style={{ marginBottom: '10px', fontSize: '0.9em' }}>
+              <strong>目的関数:</strong><br/>
+              <code style={{ fontSize: '0.85em' }}>
+                min: {cx >= 0 ? '' : '-'}{Math.abs(cx).toFixed(1)}·x + {cy >= 0 ? '+' : '-'}{Math.abs(cy).toFixed(1)}·y 
+                {parseFloat(epsilon) > 0 && ` + (${parseFloat(epsilon).toFixed(1)}/2)·(x² + y²)`}
+              </code>
+            </div>
+
+            {solution.x !== undefined && solution.y !== undefined && (
+              <>
+                <div style={{ marginTop: '10px', fontSize: '0.85em' }}>
+                  <strong>目的関数の値:</strong> {solution.objective_value?.toFixed(6) || '計算中...'}<br/>
+                  <span style={{ marginLeft: '10px', color: '#666' }}>
+                    内訳: 
+                    線形項 = {(cx * solution.x + cy * solution.y).toFixed(4)}, 
+                    {parseFloat(epsilon) > 0 && (
+                      <>二次項 = {((parseFloat(epsilon) / 2.0) * (solution.x * solution.x + solution.y * solution.y)).toFixed(4)}</>
+                    )}
+                  </span>
+                </div>
+
+                <div style={{ marginTop: '10px', fontSize: '0.85em' }}>
+                  <strong>制約条件の確認:</strong><br/>
+                  <span style={{ color: solution.x >= 0 && solution.x <= 1 ? 'green' : 'red' }}>
+                    ✓ 0 ≤ x ≤ 1: {solution.x.toFixed(4)} {solution.x >= 0 && solution.x <= 1 ? '✓' : '✗'}
+                  </span><br/>
+                  <span style={{ color: solution.y >= 0 && solution.y <= 1 ? 'green' : 'red' }}>
+                    ✓ 0 ≤ y ≤ 1: {solution.y.toFixed(4)} {solution.y >= 0 && solution.y <= 1 ? '✓' : '✗'}
+                  </span><br/>
+                  <span style={{ color: (solution.x + solution.y) <= 1 ? 'green' : 'red' }}>
+                    ✓ x + y ≤ 1: {(solution.x + solution.y).toFixed(4)} {(solution.x + solution.y) <= 1 ? '✓' : '✗'}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -139,8 +188,8 @@ const App = () => {
               },
               // 3. 最適解 (点)
               {
-                x: [solution.x],
-                y: [solution.y],
+                x: solution.x !== undefined ? [solution.x] : [0],
+                y: solution.y !== undefined ? [solution.y] : [0],
                 type: 'scatter',
                 mode: 'markers',
                 showlegend: false, // 凡例から除外（グラフ内に表示）
@@ -150,7 +199,7 @@ const App = () => {
             layout={{
               width: 500,
               height: 500,
-              title: epsilon == 0 ? '線形目的関数 (等高線は直線)' : '二乗項付き目的関数 (等高線は楕円)',
+              title: parseFloat(epsilon) === 0 ? '線形目的関数 (等高線は直線)' : '二乗項付き目的関数 (等高線は楕円)',
               xaxis: { range: [-0.2, 1.2], title: 'x' },
               yaxis: { range: [-0.2, 1.2], title: 'y', scaleanchor: "x" },
               annotations: [
@@ -167,7 +216,7 @@ const App = () => {
                   borderpad: 4
                 },
                 // 最適解の説明（最適解の近くに表示）
-                {
+                ...(solution.x !== undefined && solution.y !== undefined ? [{
                   x: solution.x,
                   y: solution.y + 0.08,
                   text: '最適解',
@@ -182,7 +231,7 @@ const App = () => {
                   bordercolor: 'red',
                   borderwidth: 1,
                   borderpad: 4
-                }
+                }] : [])
               ],
               shapes: [
                 // 参考: x+y=1の補助線などを引く場合はここ
