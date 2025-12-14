@@ -1,55 +1,57 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import Plot from 'react-plotly.js';
-import axios from 'axios';
+import React, { useState, useEffect, useMemo } from "react";
+import Plot from "react-plotly.js";
+import axios from "axios";
 
 const App = () => {
-  // 3. ユーザー操作: スライダーの状態管理
   const [cx, setCx] = useState(-1.0);
   const [cy, setCy] = useState(-1.0);
-  const [epsilon, setEpsilon] = useState(0.0); // 0のときは線形
-  const [solution, setSolution] = useState({ x: 0, y: 0, objective_value: 0, success: false });
+  const [epsilon, setEpsilon] = useState(0.0);
+  const [solution, setSolution] = useState({
+    x: 0,
+    y: 0,
+    objective_value: 0,
+    success: false,
+  });
 
-  // 最適化APIを叩く
   useEffect(() => {
     const fetchSolution = async () => {
       try {
-        const response = await axios.post('http://localhost:8000/optimize', {
-          cx: parseFloat(cx) || 0,
-          cy: parseFloat(cy) || 0,
-          epsilon: parseFloat(epsilon) || 0,
+        const response = await axios.post("http://localhost:8000/optimize", {
+          cx: Number(cx) || 0,
+          cy: Number(cy) || 0,
+          epsilon: Number(epsilon) || 0,
         });
         setSolution(response.data);
       } catch (error) {
         console.error("Optimization error", error);
-        // エラー時はデフォルト値を設定
         setSolution({ x: 0, y: 0, objective_value: 0, success: false });
       }
     };
     fetchSolution();
   }, [cx, cy, epsilon]);
 
-  // 4. 表示内容: 等高線データの生成
   const contourData = useMemo(() => {
-    const size = 100;
+    const size = 110;
     const x = [];
     const y = [];
     const z = [];
 
-    // -0.2 ~ 1.2 の範囲でグリッドを作成（可視化用）
     for (let i = 0; i < size; i++) {
-      const val = -0.2 + (1.4 * i) / size;
+      const val = -0.2 + (1.4 * i) / (size - 1);
       x.push(val);
       y.push(val);
     }
+
+    const eps = Number(epsilon) || 0;
+    const ccx = Number(cx) || 0;
+    const ccy = Number(cy) || 0;
 
     for (let j = 0; j < size; j++) {
       const row = [];
       for (let i = 0; i < size; i++) {
         const xi = x[i];
         const yi = y[j];
-        // 目的関数の値を計算 Z = cx*x + cy*y + (eps/2)(x^2+y^2)
-        const eps = parseFloat(epsilon) || 0;
-        const val = parseFloat(cx) * xi + parseFloat(cy) * yi + (eps / 2.0) * (xi * xi + yi * yi);
+        const val = ccx * xi + ccy * yi + (eps / 2.0) * (xi * xi + yi * yi);
         row.push(val);
       }
       z.push(row);
@@ -57,187 +59,412 @@ const App = () => {
     return { x, y, z };
   }, [cx, cy, epsilon]);
 
+  const eps = Number(epsilon) || 0;
+  const isLinear = eps === 0;
+
+  const xSol = Number.isFinite(solution?.x) ? solution.x : 0;
+  const ySol = Number.isFinite(solution?.y) ? solution.y : 0;
+
+  const linearPart = (Number(cx) * xSol + Number(cy) * ySol) || 0;
+  const quadPart = eps > 0 ? (eps / 2.0) * (xSol * xSol + ySol * ySol) : 0;
+
+  const formulaText = `min: ${Number(cx).toFixed(1)}·x ${
+    Number(cy) >= 0 ? "+" : "-"
+  } ${Math.abs(Number(cy)).toFixed(1)}·y${
+    eps > 0 ? ` + (${eps.toFixed(1)}/2)·(x² + y²)` : ""
+  }`;
+
+  const styles = {
+    page: {
+      fontFamily:
+        'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
+      background: "#0b0f17",
+      color: "#e8eefc",
+      minHeight: "100vh",
+      width: "100%",
+      margin: 0,
+      padding: 0,
+    },
+    container: {
+      width: "100%",
+      maxWidth: "100%",
+      margin: "0 auto",
+      padding: "20px 16px 28px",
+      boxSizing: "border-box",
+    },
+    header: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 14,
+    },
+    titleWrap: { display: "flex", flexDirection: "column", gap: 6 },
+    h1: { margin: 0, fontSize: 20, letterSpacing: 0.2 },
+    sub: { margin: 0, fontSize: 13, color: "rgba(232,238,252,0.75)" },
+    chip: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 10px",
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.08)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      fontSize: 12,
+      color: "rgba(232,238,252,0.90)",
+      whiteSpace: "nowrap",
+    },
+    dot: (ok) => ({
+      width: 8,
+      height: 8,
+      borderRadius: 99,
+      background: ok ? "#29d391" : "#f3b94a",
+      boxShadow: `0 0 0 4px rgba(255,255,255,0.06)`,
+    }),
+
+    grid: {
+      display: "grid",
+      gridTemplateColumns: "360px 1fr",
+      gap: 14,
+      alignItems: "start",
+      width: "100%",
+    },
+
+    card: {
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 16,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+    },
+    cardPad: { padding: 14 },
+
+    sidebar: {
+      position: "sticky",
+      top: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+    },
+
+    sectionTitle: {
+      margin: "0 0 10px",
+      fontSize: 13,
+      color: "rgba(232,238,252,0.85)",
+      letterSpacing: 0.2,
+    },
+
+    sliderRow: { display: "grid", gap: 8, marginBottom: 14 },
+    sliderHead: {
+      display: "flex",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    label: { fontSize: 13, color: "rgba(232,238,252,0.90)" },
+    value: { fontSize: 12, color: "rgba(232,238,252,0.65)" },
+    range: { width: "100%" },
+
+    kpiGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+    },
+    kpi: {
+      padding: 12,
+      borderRadius: 14,
+      background: "rgba(0,0,0,0.18)",
+      border: "1px solid rgba(255,255,255,0.10)",
+    },
+    kpiLabel: { fontSize: 11, color: "rgba(232,238,252,0.65)", margin: 0 },
+    kpiValue: { fontSize: 18, margin: "4px 0 0", letterSpacing: 0.2 },
+
+    plotWrap: {
+      minHeight: 520,
+      padding: 12,
+    },
+    plotInner: {
+      height: 520,
+      borderRadius: 14,
+      overflow: "hidden",
+      border: "1px solid rgba(255,255,255,0.10)",
+      background: "rgba(0,0,0,0.18)",
+    },
+
+    details: {
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 14,
+      background: "rgba(0,0,0,0.18)",
+      border: "1px solid rgba(255,255,255,0.10)",
+    },
+    summary: {
+      cursor: "pointer",
+      fontSize: 13,
+      color: "rgba(232,238,252,0.90)",
+      listStyle: "none",
+      outline: "none",
+    },
+    code: {
+      display: "block",
+      marginTop: 8,
+      padding: 10,
+      borderRadius: 12,
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      color: "rgba(232,238,252,0.90)",
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      fontSize: 12,
+      overflowX: "auto",
+    },
+
+    ok: { color: "#29d391" },
+    ng: { color: "#ff6b6b" },
+
+    // レスポンシブ対応
+    responsive: `
+      @media (max-width: 920px) {
+        .grid { grid-template-columns: 1fr; }
+        .plotInner { height: 460px; }
+        .sidebar { position: static; }
+      }
+      @media (min-width: 1400px) {
+        .grid { grid-template-columns: 380px 1fr; }
+      }
+    `,
+  };
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1>最適化シミュレーター: 線形 vs 二乗項</h1>
-      
-      {/* 5. 説明文エリア */}
-      <div style={{ backgroundColor: '#f0f8ff', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-        <h3>💡 直感ガイド</h3>
-        <p>
-          <strong>線形 (ε=0):</strong> 「平らな坂道」。ボールは壁や角（端っこ）まで転がります。<br />
-          <strong>二乗項あり (ε>0):</strong> 「お椀」。中心に戻ろうとする力が働き、極端な値を避けやすくなります。<br />
-          スライダーを動かして、赤い点（最適解）がどう動くか観察してください。
-        </p>
-      </div>
+    <div style={styles.page}>
+      <style>{styles.responsive}</style>
 
-      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-        {/* コントロールパネル */}
-        <div style={{ flex: 1, minWidth: '300px', border: '1px solid #ddd', padding: '20px', borderRadius: '8px' }}>
-          <h3>パラメータ操作</h3>
-          
-          <div style={{ marginBottom: '20px' }}>
-            <label><strong>Cx (X方向の傾き):</strong> {cx}</label>
-            <input 
-              type="range" min="-2" max="2" step="0.1" value={cx} 
-              onChange={e => setCx(parseFloat(e.target.value))} style={{ width: '100%' }} 
-            />
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.titleWrap}>
+            <h1 style={styles.h1}>最適化シミュレーター</h1>
+            <p style={styles.sub}>
+              線形(ε=0) と二乗項(ε&gt;0) の最適解の動きを同じ画面で確認
+            </p>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label><strong>Cy (Y方向の傾き):</strong> {cy}</label>
-            <input 
-              type="range" min="-2" max="2" step="0.1" value={cy} 
-              onChange={e => setCy(parseFloat(e.target.value))} style={{ width: '100%' }} 
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px', borderTop: '2px solid #eee', paddingTop: '10px' }}>
-            <label><strong>ε (イプシロン / お椀の深さ):</strong> {epsilon}</label>
-            <br/>
-            <span style={{fontSize: '0.8em', color: '#666'}}>
-              {parseFloat(epsilon) === 0 ? "現在は「線形計画」モードです" : "現在は「二乗項（正則化）」モードです"}
-            </span>
-            <input 
-              type="range" min="0" max="5" step="0.1" value={epsilon} 
-              onChange={e => setEpsilon(parseFloat(e.target.value))} style={{ width: '100%' }} 
-            />
-          </div>
-
-          <div style={{ marginTop: '30px', backgroundColor: '#eef', padding: '10px', borderRadius: '5px' }}>
-            <h4>📍 現在の最適解</h4>
-            <p>x = {solution.x?.toFixed(4) || '0.0000'}</p>
-            <p>y = {solution.y?.toFixed(4) || '0.0000'}</p>
-            {solution.success !== undefined && (
-              <p style={{ fontSize: '0.9em', color: solution.success ? 'green' : 'red' }}>
-                {solution.success ? '✓ 最適化成功' : '✗ 最適化失敗'}
-              </p>
-            )}
-          </div>
-
-          {/* 定式化の検証セクション */}
-          <div style={{ marginTop: '20px', backgroundColor: '#fff8e1', padding: '15px', borderRadius: '5px', border: '1px solid #ffc107' }}>
-            <h4>📐 定式化の検証</h4>
-            
-            <div style={{ marginBottom: '10px', fontSize: '0.9em' }}>
-              <strong>目的関数:</strong><br/>
-              <code style={{ fontSize: '0.85em' }}>
-                min: {cx >= 0 ? '' : '-'}{Math.abs(cx).toFixed(1)}·x + {cy >= 0 ? '+' : '-'}{Math.abs(cy).toFixed(1)}·y 
-                {parseFloat(epsilon) > 0 && ` + (${parseFloat(epsilon).toFixed(1)}/2)·(x² + y²)`}
-              </code>
-            </div>
-
-            {solution.x !== undefined && solution.y !== undefined && (
-              <>
-                <div style={{ marginTop: '10px', fontSize: '0.85em' }}>
-                  <strong>目的関数の値:</strong> {solution.objective_value?.toFixed(6) || '計算中...'}<br/>
-                  <span style={{ marginLeft: '10px', color: '#666' }}>
-                    内訳: 
-                    線形項 = {(cx * solution.x + cy * solution.y).toFixed(4)}, 
-                    {parseFloat(epsilon) > 0 && (
-                      <>二次項 = {((parseFloat(epsilon) / 2.0) * (solution.x * solution.x + solution.y * solution.y)).toFixed(4)}</>
-                    )}
-                  </span>
-                </div>
-
-                <div style={{ marginTop: '10px', fontSize: '0.85em' }}>
-                  <strong>制約条件の確認:</strong><br/>
-                  <span style={{ color: solution.x >= 0 && solution.x <= 1 ? 'green' : 'red' }}>
-                    ✓ 0 ≤ x ≤ 1: {solution.x.toFixed(4)} {solution.x >= 0 && solution.x <= 1 ? '✓' : '✗'}
-                  </span><br/>
-                  <span style={{ color: solution.y >= 0 && solution.y <= 1 ? 'green' : 'red' }}>
-                    ✓ 0 ≤ y ≤ 1: {solution.y.toFixed(4)} {solution.y >= 0 && solution.y <= 1 ? '✓' : '✗'}
-                  </span><br/>
-                  <span style={{ color: (solution.x + solution.y) <= 1 ? 'green' : 'red' }}>
-                    ✓ x + y ≤ 1: {(solution.x + solution.y).toFixed(4)} {(solution.x + solution.y) <= 1 ? '✓' : '✗'}
-                  </span>
-                </div>
-              </>
-            )}
+          <div style={styles.chip}>
+            <span style={styles.dot(isLinear)} />
+            {isLinear ? "Linear mode" : "Quadratic mode"}
           </div>
         </div>
 
-        {/* グラフエリア */}
-        <div style={{ flex: 2, minWidth: '400px' }}>
-          <Plot
-            data={[
-              // 1. 等高線 (Contour)
-              {
-                z: contourData.z,
-                x: contourData.x,
-                y: contourData.y,
-                type: 'contour',
-                colorscale: 'Viridis',
-                contours: {
-                  showlabels: true,
-                },
-                line: { width: 0.5 },
-                opacity: 0.3,
-                name: '目的関数'
-              },
-              // 2. 制約領域 (三角形)
-              {
-                x: [0, 1, 0, 0],
-                y: [0, 0, 1, 0],
-                fill: 'toself',
-                type: 'scatter',
-                mode: 'lines',
-                showlegend: false, // 凡例から除外（グラフ内に表示）
-                fillcolor: 'rgba(255, 0, 0, 0.1)',
-                line: { color: 'red', width: 2 }
-              },
-              // 3. 最適解 (点)
-              {
-                x: solution.x !== undefined ? [solution.x] : [0],
-                y: solution.y !== undefined ? [solution.y] : [0],
-                type: 'scatter',
-                mode: 'markers',
-                showlegend: false, // 凡例から除外（グラフ内に表示）
-                marker: { color: 'red', size: 12, symbol: 'x' }
-              }
-            ]}
-            layout={{
-              width: 500,
-              height: 500,
-              title: parseFloat(epsilon) === 0 ? '線形目的関数 (等高線は直線)' : '二乗項付き目的関数 (等高線は楕円)',
-              xaxis: { range: [-0.2, 1.2], title: 'x' },
-              yaxis: { range: [-0.2, 1.2], title: 'y', scaleanchor: "x" },
-              annotations: [
-                // 可行領域の説明（グラフ内左上）
-                {
-                  x: 0.05,
-                  y: 1.1,
-                  text: '制約領域',
-                  showarrow: false,
-                  font: { color: 'red', size: 12 },
-                  bgcolor: 'rgba(255, 255, 255, 0.7)',
-                  bordercolor: 'red',
-                  borderwidth: 1,
-                  borderpad: 4
-                },
-                // 最適解の説明（最適解の近くに表示）
-                ...(solution.x !== undefined && solution.y !== undefined ? [{
-                  x: solution.x,
-                  y: solution.y + 0.08,
-                  text: '最適解',
-                  showarrow: true,
-                  arrowhead: 2,
-                  arrowcolor: 'red',
-                  arrowwidth: 2,
-                  ax: 0,
-                  ay: -30,
-                  font: { color: 'red', size: 12 },
-                  bgcolor: 'rgba(255, 255, 255, 0.7)',
-                  bordercolor: 'red',
-                  borderwidth: 1,
-                  borderpad: 4
-                }] : [])
-              ],
-              shapes: [
-                // 参考: x+y=1の補助線などを引く場合はここ
-              ]
-            }}
-          />
+        <div className="grid" style={styles.grid}>
+          {/* 左：操作＆結果 */}
+          <div style={styles.sidebar} className="sidebar">
+            <div style={{ ...styles.card, ...styles.cardPad }}>
+              <h3 style={styles.sectionTitle}>パラメータ</h3>
+
+              <div style={styles.sliderRow}>
+                <div style={styles.sliderHead}>
+                  <div style={styles.label}>Cx（X方向の傾き）</div>
+                  <div style={styles.value}>{Number(cx).toFixed(1)}</div>
+                </div>
+                <input
+                  style={styles.range}
+                  type="range"
+                  min="-2"
+                  max="2"
+                  step="0.1"
+                  value={cx}
+                  onChange={(e) => setCx(parseFloat(e.target.value))}
+                />
+              </div>
+
+              <div style={styles.sliderRow}>
+                <div style={styles.sliderHead}>
+                  <div style={styles.label}>Cy（Y方向の傾き）</div>
+                  <div style={styles.value}>{Number(cy).toFixed(1)}</div>
+                </div>
+                <input
+                  style={styles.range}
+                  type="range"
+                  min="-2"
+                  max="2"
+                  step="0.1"
+                  value={cy}
+                  onChange={(e) => setCy(parseFloat(e.target.value))}
+                />
+              </div>
+
+              <div style={{ ...styles.sliderRow, marginBottom: 0 }}>
+                <div style={styles.sliderHead}>
+                  <div style={styles.label}>ε（お椀の深さ）</div>
+                  <div style={styles.value}>{Number(epsilon).toFixed(1)}</div>
+                </div>
+                <input
+                  style={styles.range}
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={epsilon}
+                  onChange={(e) => setEpsilon(parseFloat(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div style={{ ...styles.card, ...styles.cardPad }}>
+              <h3 style={styles.sectionTitle}>現在の最適解</h3>
+
+              <div style={styles.kpiGrid}>
+                <div style={styles.kpi}>
+                  <p style={styles.kpiLabel}>x</p>
+                  <p style={styles.kpiValue}>{xSol.toFixed(4)}</p>
+                </div>
+                <div style={styles.kpi}>
+                  <p style={styles.kpiLabel}>y</p>
+                  <p style={styles.kpiValue}>{ySol.toFixed(4)}</p>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10, fontSize: 12 }}>
+                <span style={solution?.success ? styles.ok : styles.ng}>
+                  {solution?.success ? "✓ 最適化成功" : "✗ 最適化失敗"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 右：グラフ＆検証 */}
+          <div style={{ ...styles.card, ...styles.plotWrap }}>
+            <div style={styles.plotInner}>
+              <Plot
+                data={[
+                  {
+                    z: contourData.z,
+                    x: contourData.x,
+                    y: contourData.y,
+                    type: "contour",
+                    colorscale: "Viridis",
+                    contours: { showlabels: true },
+                    line: { width: 0.5 },
+                    opacity: 0.30,
+                    name: "目的関数",
+                  },
+                  {
+                    x: [0, 1, 0, 0],
+                    y: [0, 0, 1, 0],
+                    fill: "toself",
+                    type: "scatter",
+                    mode: "lines",
+                    showlegend: false,
+                    fillcolor: "rgba(255, 80, 80, 0.12)",
+                    line: { color: "rgba(255, 80, 80, 0.95)", width: 2 },
+                  },
+                  {
+                    x: [xSol],
+                    y: [ySol],
+                    type: "scatter",
+                    mode: "markers",
+                    showlegend: false,
+                    marker: { color: "rgba(255, 80, 80, 0.95)", size: 12, symbol: "x" },
+                  },
+                ]}
+                layout={{
+                  autosize: true,
+                  margin: { l: 48, r: 18, t: 44, b: 44 },
+                  title: {
+                    text: isLinear
+                      ? "線形目的関数（等高線は直線）"
+                      : "二乗項付き（等高線は楕円）",
+                    font: { size: 14, color: "rgba(232,238,252,0.92)" },
+                  },
+                  paper_bgcolor: "rgba(0,0,0,0)",
+                  plot_bgcolor: "rgba(0,0,0,0)",
+                  xaxis: {
+                    range: [-0.2, 1.2],
+                    title: { text: "x", font: { color: "rgba(232,238,252,0.70)" } },
+                    gridcolor: "rgba(255,255,255,0.08)",
+                    zerolinecolor: "rgba(255,255,255,0.12)",
+                    tickfont: { color: "rgba(232,238,252,0.70)" },
+                  },
+                  yaxis: {
+                    range: [-0.2, 1.2],
+                    title: { text: "y", font: { color: "rgba(232,238,252,0.70)" } },
+                    scaleanchor: "x",
+                    gridcolor: "rgba(255,255,255,0.08)",
+                    zerolinecolor: "rgba(255,255,255,0.12)",
+                    tickfont: { color: "rgba(232,238,252,0.70)" },
+                  },
+                  annotations: [
+                    {
+                      x: 0.05,
+                      y: 1.1,
+                      xref: "x",
+                      yref: "y",
+                      text: "制約領域",
+                      showarrow: false,
+                      font: { color: "rgba(255, 80, 80, 0.95)", size: 12 },
+                      bgcolor: "rgba(0,0,0,0.35)",
+                      bordercolor: "rgba(255, 80, 80, 0.7)",
+                      borderwidth: 1,
+                      borderpad: 4,
+                    },
+                    {
+                      x: xSol,
+                      y: ySol,
+                      xref: "x",
+                      yref: "y",
+                      text: "最適解",
+                      showarrow: true,
+                      arrowhead: 2,
+                      arrowcolor: "rgba(255, 80, 80, 0.95)",
+                      arrowwidth: 2,
+                      ax: 0,
+                      ay: -30,
+                      font: { color: "rgba(255, 80, 80, 0.95)", size: 12 },
+                      bgcolor: "rgba(0,0,0,0.35)",
+                      bordercolor: "rgba(255, 80, 80, 0.7)",
+                      borderwidth: 1,
+                      borderpad: 4,
+                    },
+                  ],
+                }}
+                config={{ responsive: true, displayModeBar: false }}
+                useResizeHandler
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
+
+            <details style={styles.details}>
+              <summary style={styles.summary}>📐 定式化の検証（クリックで展開）</summary>
+
+              <code style={styles.code}>{formulaText}</code>
+
+              <div style={{ marginTop: 10, fontSize: 12, color: "rgba(232,238,252,0.80)" }}>
+                <div>
+                  <strong>目的関数値:</strong>{" "}
+                  {Number.isFinite(solution?.objective_value)
+                    ? solution.objective_value.toFixed(6)
+                    : "計算中..."}
+                </div>
+                <div style={{ marginTop: 6, color: "rgba(232,238,252,0.65)" }}>
+                  内訳: 線形項 = {linearPart.toFixed(4)}
+                  {eps > 0 ? ` / 二次項 = ${quadPart.toFixed(4)}` : ""}
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <strong>制約:</strong>
+                  <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
+                    <span style={xSol >= 0 && xSol <= 1 ? styles.ok : styles.ng}>
+                      0 ≤ x ≤ 1 : {xSol.toFixed(4)}
+                    </span>
+                    <span style={ySol >= 0 && ySol <= 1 ? styles.ok : styles.ng}>
+                      0 ≤ y ≤ 1 : {ySol.toFixed(4)}
+                    </span>
+                    <span style={xSol + ySol <= 1 ? styles.ok : styles.ng}>
+                      x + y ≤ 1 : {(xSol + ySol).toFixed(4)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
     </div>
