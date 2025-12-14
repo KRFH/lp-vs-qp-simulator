@@ -328,6 +328,41 @@ const App = () => {
                 </span>
               </div>
             </div>
+
+            {/* 定式化の検証セクション */}
+            <details style={styles.details} open>
+              <summary style={styles.summary}>📐 定式化の検証（クリックで折りたたみ）</summary>
+
+              <code style={styles.code}>{formulaText}</code>
+
+              <div style={{ marginTop: 10, fontSize: 12, color: "rgba(232,238,252,0.80)" }}>
+                <div>
+                  <strong>目的関数値:</strong>{" "}
+                  {Number.isFinite(solution?.objective_value)
+                    ? solution.objective_value.toFixed(6)
+                    : "計算中..."}
+                </div>
+                <div style={{ marginTop: 6, color: "rgba(232,238,252,0.65)" }}>
+                  内訳: 線形項 = {linearPart.toFixed(4)}
+                  {eps > 0 ? ` / 二次項 = ${quadPart.toFixed(4)}` : ""}
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <strong>制約:</strong>
+                  <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
+                    <span style={xSol >= 0 && xSol <= 1 ? styles.ok : styles.ng}>
+                      0 ≤ x ≤ 1 : {xSol.toFixed(4)}
+                    </span>
+                    <span style={ySol >= 0 && ySol <= 1 ? styles.ok : styles.ng}>
+                      0 ≤ y ≤ 1 : {ySol.toFixed(4)}
+                    </span>
+                    <span style={xSol + ySol <= 1 ? styles.ok : styles.ng}>
+                      x + y ≤ 1 : {(xSol + ySol).toFixed(4)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
 
           {/* 右：グラフ＆検証 */}
@@ -340,10 +375,17 @@ const App = () => {
                     x: contourData.x,
                     y: contourData.y,
                     type: "contour",
-                    colorscale: "Viridis",
+                    colorscale: [
+                      [0, "rgb(0,0,128)"],      // 濃い青
+                      [0.2, "rgb(0,0,255)"],    // 青
+                      [0.4, "rgb(0,255,255)"],  // シアン
+                      [0.6, "rgb(255,255,0)"],  // 黄色
+                      [0.8, "rgb(255,165,0)"],  // オレンジ
+                      [1, "rgb(255,0,0)"]       // 赤
+                    ],
                     contours: { showlabels: true },
-                    line: { width: 0.5 },
-                    opacity: 0.30,
+                    line: { width: 0.5, color: "rgba(255,255,255,0.3)" },
+                    opacity: 0.50,
                     name: "目的関数",
                   },
                   {
@@ -430,40 +472,6 @@ const App = () => {
                 style={{ width: "100%", height: "100%" }}
               />
             </div>
-
-            <details style={styles.details}>
-              <summary style={styles.summary}>📐 定式化の検証（クリックで展開）</summary>
-
-              <code style={styles.code}>{formulaText}</code>
-
-              <div style={{ marginTop: 10, fontSize: 12, color: "rgba(232,238,252,0.80)" }}>
-                <div>
-                  <strong>目的関数値:</strong>{" "}
-                  {Number.isFinite(solution?.objective_value)
-                    ? solution.objective_value.toFixed(6)
-                    : "計算中..."}
-                </div>
-                <div style={{ marginTop: 6, color: "rgba(232,238,252,0.65)" }}>
-                  内訳: 線形項 = {linearPart.toFixed(4)}
-                  {eps > 0 ? ` / 二次項 = ${quadPart.toFixed(4)}` : ""}
-                </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <strong>制約:</strong>
-                  <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
-                    <span style={xSol >= 0 && xSol <= 1 ? styles.ok : styles.ng}>
-                      0 ≤ x ≤ 1 : {xSol.toFixed(4)}
-                    </span>
-                    <span style={ySol >= 0 && ySol <= 1 ? styles.ok : styles.ng}>
-                      0 ≤ y ≤ 1 : {ySol.toFixed(4)}
-                    </span>
-                    <span style={xSol + ySol <= 1 ? styles.ok : styles.ng}>
-                      x + y ≤ 1 : {(xSol + ySol).toFixed(4)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </details>
           </div>
         </div>
       </div>
