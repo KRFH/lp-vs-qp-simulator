@@ -133,7 +133,7 @@ const App = () => {
                 fill: 'toself',
                 type: 'scatter',
                 mode: 'lines',
-                name: '可行領域',
+                showlegend: false, // 凡例から除外（グラフ内に表示）
                 fillcolor: 'rgba(255, 0, 0, 0.1)',
                 line: { color: 'red', width: 2 }
               },
@@ -143,8 +143,8 @@ const App = () => {
                 y: [solution.y],
                 type: 'scatter',
                 mode: 'markers',
-                marker: { color: 'red', size: 12, symbol: 'x' },
-                name: '最適解'
+                showlegend: false, // 凡例から除外（グラフ内に表示）
+                marker: { color: 'red', size: 12, symbol: 'x' }
               }
             ]}
             layout={{
@@ -153,6 +153,37 @@ const App = () => {
               title: epsilon == 0 ? '線形目的関数 (等高線は直線)' : '二乗項付き目的関数 (等高線は楕円)',
               xaxis: { range: [-0.2, 1.2], title: 'x' },
               yaxis: { range: [-0.2, 1.2], title: 'y', scaleanchor: "x" },
+              annotations: [
+                // 可行領域の説明（グラフ内左上）
+                {
+                  x: 0.05,
+                  y: 1.1,
+                  text: '制約領域',
+                  showarrow: false,
+                  font: { color: 'red', size: 12 },
+                  bgcolor: 'rgba(255, 255, 255, 0.7)',
+                  bordercolor: 'red',
+                  borderwidth: 1,
+                  borderpad: 4
+                },
+                // 最適解の説明（最適解の近くに表示）
+                {
+                  x: solution.x,
+                  y: solution.y + 0.08,
+                  text: '最適解',
+                  showarrow: true,
+                  arrowhead: 2,
+                  arrowcolor: 'red',
+                  arrowwidth: 2,
+                  ax: 0,
+                  ay: -30,
+                  font: { color: 'red', size: 12 },
+                  bgcolor: 'rgba(255, 255, 255, 0.7)',
+                  bordercolor: 'red',
+                  borderwidth: 1,
+                  borderpad: 4
+                }
+              ],
               shapes: [
                 // 参考: x+y=1の補助線などを引く場合はここ
               ]
